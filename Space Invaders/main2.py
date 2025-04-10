@@ -1,505 +1,248 @@
 import pygame
 import random
 import sys
-import os
 
-# Inicializar Pygame
+# Inicializar pygame
 pygame.init()
 
 # Configuración de la pantalla
-WIDTH, HEIGHT = 800, 600
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
+ANCHO = 800
+ALTO = 600
+pantalla = pygame.display.set_mode((ANCHO, ALTO))
 pygame.display.set_caption("Space Invaders")
 
-# Cargar imágenes desde la carpeta "imagenes"
-img_path = os.path.join("imagenes")
-NAVE_IMG = pygame.image.load(os.path.join(img_path, "nave.png"))
-GREEN_ALIEN_IMG = pygame.image.load(os.path.join(img_path, "green.png"))
-RED_ALIEN_IMG = pygame.image.load(os.path.join(img_path, "red.png"))
-YELLOW_ALIEN_IMG = pygame.image.load(os.path.join(img_path, "yellow.png"))
-
-# Redimensionar imágenes si es necesario
-NAVE_IMG = pygame.transform.scale(NAVE_IMG, (50, 50))
-GREEN_ALIEN_IMG = pygame.transform.scale(GREEN_ALIEN_IMG, (40, 40))
-RED_ALIEN_IMG = pygame.transform.scale(RED_ALIEN_IMG, (40, 40))
-YELLOW_ALIEN_IMG = pygame.transform.scale(YELLOW_ALIEN_IMG, (40, 40))
-
 # Colores
-WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
-GREEN = (0, 255, 0)
-RED = (255, 0, 0)
-YELLOW = (255, 255, 0)
-BLUE = (0, 0, 255)
+NEGRO = (0, 0, 0)
+BLANCO = (255, 255, 255)
+VERDE = (0, 255, 0)
+ROJO = (255, 0, 0)
+AZUL = (0, 0, 255)
 
-# Configuración del reloj y FPS
-clock = pygame.time.Clock()
-FPS = 60
-
-# Clase para la nave del jugador
-class Player(pygame.sprite.Sprite):
+# Configuración del jugador
+class Jugador(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
-        self.image = NAVE_IMG
+        self.image = pygame.Surface((50, 30))
+        self.image.fill(VERDE)
         self.rect = self.image.get_rect()
-        self.rect.centerx = WIDTH // 2
-        self.rect.bottom = HEIGHT - 20
-        self.speed = 5
-        self.lives = 3
-        self.score = 0
-    
+        self.rect.centerx = ANCHO // 2
+        self.rect.bottom = ALTO - 10
+        self.velocidad_x = 0
+        self.ultimo_disparo = pygame.time.get_ticks()
+        self.cadencia_disparo = 300  # milisegundos
+
     def update(self):
-        keys = pygame.key.get_pressed()
-        if keys[pygame.K_a] and self.rect.left > 0:  # Mover a la izquierda
-            self.rect.x -= self.speed
-        if keys[pygame.K_d] and self.rect.right < WIDTH:  # Mover a la derecha
-            self.rect.x += self.speed
-    
-    def shoot(self):
-        bullet = Bullet(self.rect.centerx, self.rect.top)
-        all_sprites.add(bullet)
-        bullets.add(bullet)
+        # Movimiento lateral
+        self.velocidad_x = 0
+        teclas = pygame.key.get_pressed()
+        if teclas[pygame.K_LEFT]:
+            self.velocidad_x = -7
+        if teclas[pygame.K_RIGHT]:
+            self.velocidad_x = 7
+        self.rect.x += self.velocidad_x
+        
+        # Limitar al área de la pantalla
+        if self.rect.left < 0:
+            self.rect.left = 0
+        if self.rect.right > ANCHO:
+            self.rect.right = ANCHO
+
+    def disparar(self):
+        ahora = pygame.time.get_ticks()
+        if ahora - self.ultimo_disparo > self.cadencia_disparo:
+            self.ultimo_disparo = ahora
+            return Bala(self.rect.centerx, self.rect.top, -10)  # -10 es la velocidad hacia arriba
+        return None
 
 # Clase para los aliens
 class Alien(pygame.sprite.Sprite):
-    def __init__(self, x, y, alien_type, level=1):
+    def __init__(self, x, y):
         super().__init__()
-        self.alien_type = alien_type
-        self.level = level
-        
-        # Configurar tipo de alien
-        if alien_type == "green":
-            self.image = GREEN_ALIEN_IMG
-            self.value = 10
-            self.health = 1
-            self.shoot_chance = 0.001 + (level * 0.0005)  # Aumenta con el nivel
-        elif alien_type == "yellow":
-            self.image = YELLOW_ALIEN_IMG
-            self.value = 20
-            self.health = 1
-            self.shoot_chance = 0.003 + (level * 0.001)  # Disparan más a menudo
-        elif alien_type == "red":
-            self.image = RED_ALIEN_IMG
-            self.value = 30
-            self.health = 2  # Los rojos tienen 2 vidas
-            self.shoot_chance = 0.005 + (level * 0.0015)  # Los más peligrosos
-            
+        self.image = pygame.Surface((40, 40))
+        self.image.fill(ROJO)
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
-        self.direction = 1  # 1 para derecha, -1 para izquierda
-        self.base_speed = 1 + (0.2 * level)  # Velocidad base que aumenta con el nivel
-        self.speed = self.base_speed
-        
-    def update(self):
-        self.rect.x += self.direction * self.speed
-        
-    def reverse_and_down(self):
-        self.direction *= -1
-        self.rect.y += 20
-        
-    def shoot(self):
-        # Probabilidad de disparo basada en el tipo y nivel
-        if random.random() < self.shoot_chance:
-            alien_bullet = AlienBullet(self.rect.centerx, self.rect.bottom, self.alien_type)
-            all_sprites.add(alien_bullet)
-            alien_bullets.add(alien_bullet)
-            
-    def hit(self):
-        self.health -= 1
-        if self.health <= 0:
-            return True  # El alien está muerto
-        else:
-            # Parpadeo o cambio visual para indicar daño
-            temp = self.image.copy()
-            temp.fill((255, 200, 200), special_flags=pygame.BLEND_MULT)
-            self.image = temp
-            return False  # El alien sigue vivo
+        self.velocidad_x = 2
+        self.ultimo_disparo = pygame.time.get_ticks()
+        self.cadencia_disparo = random.randint(3000, 8000)  # Disparo aleatorio entre 3 y 8 segundos
 
-# Clase para las balas del jugador
-class Bullet(pygame.sprite.Sprite):
-    def __init__(self, x, y):
-        super().__init__()
-        self.image = pygame.Surface((4, 15))
-        self.image.fill(WHITE)
-        self.rect = self.image.get_rect()
-        self.rect.centerx = x
-        self.rect.bottom = y
-        self.speed = -10
-        
     def update(self):
-        self.rect.y += self.speed
-        if self.rect.bottom < 0:
-            self.kill()
+        self.rect.x += self.velocidad_x
 
-# Clase para las balas de los aliens
-class AlienBullet(pygame.sprite.Sprite):
-    def __init__(self, x, y, alien_type):
-        super().__init__()
-        self.image = pygame.Surface((4, 15))
-        
-        # Color de bala según tipo de alien
-        if alien_type == "green":
-            self.image.fill(GREEN)
-            self.speed = 5
-        elif alien_type == "yellow":
-            self.image.fill(YELLOW)
-            self.speed = 7
-        elif alien_type == "red":
-            self.image.fill(RED)
-            self.speed = 9
-        else:
-            self.image.fill(WHITE)
-            self.speed = 5
-            
-        self.rect = self.image.get_rect()
-        self.rect.centerx = x
-        self.rect.top = y
-        
-    def update(self):
-        self.rect.y += self.speed
-        if self.rect.top > HEIGHT:
-            self.kill()
+    def cambiar_direccion(self):
+        self.velocidad_x *= -1
+        self.rect.y += 20  # Bajar cuando toca el borde
+    
+    def disparar(self):
+        ahora = pygame.time.get_ticks()
+        if ahora - self.ultimo_disparo > self.cadencia_disparo:
+            self.ultimo_disparo = ahora
+            self.cadencia_disparo = random.randint(3000, 8000)  # Resetear tiempo aleatorio
+            return Bala(self.rect.centerx, self.rect.bottom, 5)  # 5 es la velocidad hacia abajo
+        return None
 
-# Clase para las barreras
-class Barrier:
-    def __init__(self, x, y):
-        self.blocks = pygame.sprite.Group()
-        self.create_barrier(x, y)
-        
-    def create_barrier(self, x, y):
-        for row in range(4):
-            for col in range(8):
-                block = BarrierBlock(x + col * 10, y + row * 10)
-                self.blocks.add(block)
-                all_sprites.add(block)
-                
-class BarrierBlock(pygame.sprite.Sprite):
-    def __init__(self, x, y):
+# Clase para los escudos
+class Escudo(pygame.sprite.Sprite):
+    def __init__(self, x):
         super().__init__()
-        self.image = pygame.Surface((10, 10))
-        self.image.fill(GREEN)
+        self.image = pygame.Surface((100, 20))
+        self.image.fill(AZUL)
         self.rect = self.image.get_rect()
         self.rect.x = x
-        self.rect.y = y
-        self.health = 3
-        
-    def hit(self):
-        self.health -= 1
-        if self.health == 2:
-            self.image.fill((0, 200, 0))  # Verde más oscuro
-        elif self.health == 1:
-            self.image.fill((0, 150, 0))  # Verde aún más oscuro
-        elif self.health <= 0:
+        self.rect.y = ALTO - 100  # Posición vertical fija
+        self.salud = 5
+
+    def recibir_daño(self):
+        self.salud -= 1
+        # Cambiar el color/tamaño según el daño recibido
+        self.image = pygame.Surface((100 - (5 - self.salud) * 10, 20))
+        self.image.fill((0, 0, min(255, 50 + 50 * self.salud)))
+        if self.salud <= 0:
             self.kill()
 
-# Función para crear la flota de aliens según el nivel
-def create_aliens(level):
+# Clase para las balas
+class Bala(pygame.sprite.Sprite):
+    def __init__(self, x, y, velocidad_y):
+        super().__init__()
+        self.image = pygame.Surface((5, 15))
+        if velocidad_y < 0:  # Si es disparo del jugador
+            self.image.fill(VERDE)
+        else:  # Si es disparo de alien
+            self.image.fill(ROJO)
+        self.rect = self.image.get_rect()
+        self.rect.centerx = x
+        self.rect.y = y
+        self.velocidad_y = velocidad_y
+
+    def update(self):
+        self.rect.y += self.velocidad_y
+        # Eliminar si sale de la pantalla
+        if self.rect.bottom < 0 or self.rect.top > ALTO:
+            self.kill()
+
+# Iniciar juego
+def iniciar_juego():
+    # Crear sprites
+    todos_los_sprites = pygame.sprite.Group()
     aliens = pygame.sprite.Group()
-    rows = 5  # Número estándar de filas
-    cols = 11  # Número estándar de columnas
+    balas_jugador = pygame.sprite.Group()
+    balas_aliens = pygame.sprite.Group()
+    escudos = pygame.sprite.Group()
     
-    # Definir tipos de aliens según nivel
-    if level == 1:
-        # Oleada 1: Todos verdes
-        alien_types = ["green"] * rows
-    elif level == 2:
-        # Oleada 2: Dos filas superiores amarillas, resto verdes
-        alien_types = ["yellow", "yellow"] + ["green"] * (rows - 2)
-    elif level == 3:
-        # Oleada 3: Todos amarillos
-        alien_types = ["yellow"] * rows
-    elif level == 4:
-        # Oleada 4: Mezcla de verdes y rojos
-        alien_types = ["red", "red"] + ["green"] * (rows - 2)
-    elif level == 5:
-        # Oleada 5: Rojos y amarillos
-        alien_types = ["red", "red"] + ["yellow"] * (rows - 2)
-    elif level == 6:
-        # Oleada 6: Mayoría rojos
-        alien_types = ["red"] * (rows - 1) + ["yellow"]
-    else:
-        # Oleada 7+: Todos rojos (máxima dificultad)
-        alien_types = ["red"] * rows
+    # Crear jugador
+    jugador = Jugador()
+    todos_los_sprites.add(jugador)
     
-    # Crear la flota según la configuración
-    spacing_x = 55
-    spacing_y = 45
-    start_x = 50
-    start_y = 50
-    
-    for row in range(rows):
-        for col in range(cols):
-            x = start_x + col * spacing_x
-            y = start_y + row * spacing_y
-            alien_type = alien_types[row]
-            
-            # Ajustar dificultad para niveles más altos
-            actual_level = min(level, 10)  # Limitar el nivel para no hacer aliens imposibles
-            alien = Alien(x, y, alien_type, actual_level)
+    # Crear aliens (5 filas de 8 aliens)
+    for fila in range(5):
+        for columna in range(8):
+            alien = Alien(100 + columna * 70, 50 + fila * 60)
             aliens.add(alien)
-            all_sprites.add(alien)
-            
-    return aliens
-
-# Función para comprobar si los aliens llegan al límite lateral
-def check_fleet_edges(aliens):
-    for alien in aliens:
-        if alien.rect.right >= WIDTH or alien.rect.left <= 0:
-            change_fleet_direction(aliens)
-            return
-
-def change_fleet_direction(aliens):
-    for alien in aliens:
-        alien.reverse_and_down()
-
-# Función para mostrar texto en pantalla
-def draw_text(surface, text, size, x, y, color=WHITE):
-    font = pygame.font.SysFont(None, size)
-    text_surface = font.render(text, True, color)
-    text_rect = text_surface.get_rect()
-    text_rect.midtop = (x, y)
-    surface.blit(text_surface, text_rect)
-
-# Función para mostrar la pantalla de inicio
-def show_start_screen():
-    screen.fill(BLACK)
-    draw_text(screen, "SPACE INVADERS", 64, WIDTH // 2, HEIGHT // 4)
-    draw_text(screen, "Usa A y D para moverte, ESPACIO para disparar", 22, WIDTH // 2, HEIGHT // 2)
-    draw_text(screen, "Presiona cualquier tecla para comenzar", 18, WIDTH // 2, HEIGHT * 3/4)
-    pygame.display.flip()
-    waiting = True
-    while waiting:
-        clock.tick(FPS)
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-            if event.type == pygame.KEYUP:
-                waiting = False
-
-# Función para mostrar la pantalla de game over
-def show_game_over_screen(score):
-    screen.fill(BLACK)
-    draw_text(screen, "GAME OVER", 64, WIDTH // 2, HEIGHT // 4)
-    draw_text(screen, f"Puntuación final: {score}", 22, WIDTH // 2, HEIGHT // 2)
-    draw_text(screen, "Presiona cualquier tecla para jugar de nuevo", 18, WIDTH // 2, HEIGHT * 3/4)
-    pygame.display.flip()
-    waiting = True
-    while waiting:
-        clock.tick(FPS)
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-            if event.type == pygame.KEYUP:
-                waiting = False
-
-# Función para el nivel completado
-def show_level_complete(level, score):
-    screen.fill(BLACK)
-    draw_text(screen, f"¡OLEADA {level} COMPLETADA!", 64, WIDTH // 2, HEIGHT // 4)
-    draw_text(screen, f"Puntuación: {score}", 22, WIDTH // 2, HEIGHT // 2)
+            todos_los_sprites.add(alien)
     
-    # Mostrar características de la siguiente oleada
-    if level == 1:
-        info = "Siguiente oleada: Aliens verdes y amarillos"
-    elif level == 2:
-        info = "Siguiente oleada: Todos amarillos, más rápidos"
-    elif level == 3:
-        info = "Siguiente oleada: Aliens verdes y rojos (2 vidas)"
-    elif level == 4:
-        info = "Siguiente oleada: Aliens rojos y amarillos, más peligrosos"
-    elif level == 5:
-        info = "Siguiente oleada: Mayoría de aliens rojos"
-    else:
-        info = "Siguiente oleada: ¡Aliens elite! Máxima dificultad"
-    
-    draw_text(screen, info, 20, WIDTH // 2, HEIGHT // 2 + 40)
-    draw_text(screen, "Presiona cualquier tecla para continuar", 18, WIDTH // 2, HEIGHT * 3/4)
-    pygame.display.flip()
-    waiting = True
-    while waiting:
-        clock.tick(FPS)
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-            if event.type == pygame.KEYUP:
-                waiting = False
-
-# Mostrar información sobre cada tipo de alien
-def show_alien_info():
-    screen.fill(BLACK)
-    draw_text(screen, "INFORMACIÓN DE ALIENS", 42, WIDTH // 2, 30)
-    
-    # Alien Verde
-    screen.blit(GREEN_ALIEN_IMG, (100, 100))
-    draw_text(screen, "Alien Verde", 22, 250, 100)
-    draw_text(screen, "Puntos: 10", 18, 250, 130)
-    draw_text(screen, "Salud: 1", 18, 250, 150)
-    draw_text(screen, "Disparo: Lento", 18, 250, 170)
-    
-    # Alien Amarillo
-    screen.blit(YELLOW_ALIEN_IMG, (100, 230))
-    draw_text(screen, "Alien Amarillo", 22, 250, 230)
-    draw_text(screen, "Puntos: 20", 18, 250, 260)
-    draw_text(screen, "Salud: 1", 18, 250, 280)
-    draw_text(screen, "Disparo: Medio", 18, 250, 300)
-    
-    # Alien Rojo
-    screen.blit(RED_ALIEN_IMG, (100, 360))
-    draw_text(screen, "Alien Rojo", 22, 250, 360)
-    draw_text(screen, "Puntos: 30", 18, 250, 390)
-    draw_text(screen, "Salud: 2", 18, 250, 410)
-    draw_text(screen, "Disparo: Rápido", 18, 250, 430)
-    
-    draw_text(screen, "Presiona cualquier tecla para comenzar", 18, WIDTH // 2, HEIGHT - 50)
-    
-    pygame.display.flip()
-    waiting = True
-    while waiting:
-        clock.tick(FPS)
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-            if event.type == pygame.KEYUP:
-                waiting = False
-
-# Función principal del juego
-def game_loop():
-    level = 1
-    game_over = False
-    running = True
-    
-    # Crear grupos de sprites
-    global all_sprites, bullets, aliens, barriers, alien_bullets
-    all_sprites = pygame.sprite.Group()
-    bullets = pygame.sprite.Group()
-    alien_bullets = pygame.sprite.Group()
-    barriers = []
-    
-    # Crear el jugador
-    player = Player()
-    all_sprites.add(player)
-    
-    # Crear aliens
-    aliens = create_aliens(level)
-    
-    # Crear barreras
+    # Crear escudos (4 escudos distribuidos)
     for i in range(4):
-        barrier = Barrier(100 + i * 200, 450)
-        barriers.append(barrier)
+        escudo = Escudo(100 + i * 200)
+        escudos.add(escudo)
+        todos_los_sprites.add(escudo)
+    
+    # Configuración del juego
+    clock = pygame.time.Clock()
+    puntuacion = 0
+    running = True
+    game_over = False
+    font = pygame.font.SysFont(None, 36)
     
     # Bucle principal del juego
     while running:
-        clock.tick(FPS)
-        
-        # Manejo de eventos
+        # Procesar eventos
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE and not game_over:
-                    player.shoot()
+                    nueva_bala = jugador.disparar()
+                    if nueva_bala:
+                        balas_jugador.add(nueva_bala)
+                        todos_los_sprites.add(nueva_bala)
+                elif event.key == pygame.K_r and game_over:
+                    return iniciar_juego()  # Reiniciar juego
         
         if not game_over:
             # Actualizar
-            all_sprites.update()
+            todos_los_sprites.update()
             
-            # Verificar si los aliens llegan a los bordes
-            check_fleet_edges(aliens)
-            
-            # Disparos de aliens
+            # Comprobar si los aliens deben cambiar de dirección
             for alien in aliens:
-                alien.shoot()
+                if alien.rect.left <= 0 or alien.rect.right >= ANCHO:
+                    for a in aliens:
+                        a.cambiar_direccion()
+                    break
             
-            # Colisiones de balas del jugador con aliens
-            hits = pygame.sprite.groupcollide(bullets, aliens, True, False)
-            for bullet in hits:
-                for alien in hits[bullet]:
-                    if alien.hit():  # Si el alien muere
-                        player.score += alien.value
-                        alien.kill()
+            # Aliens disparan aleatoriamente
+            for alien in aliens:
+                disparo = alien.disparar()
+                if disparo:
+                    balas_aliens.add(disparo)
+                    todos_los_sprites.add(disparo)
             
-            # Colisiones de balas de aliens con el jugador
-            hits = pygame.sprite.spritecollide(player, alien_bullets, True)
-            if hits:
-                player.lives -= 1
-                if player.lives <= 0:
+            # Colisiones entre balas del jugador y aliens
+            colisiones_aliens = pygame.sprite.groupcollide(aliens, balas_jugador, True, True)
+            for alien in colisiones_aliens:
+                puntuacion += 10
+            
+            # Colisiones entre balas y escudos
+            colisiones_escudos_balas_jugador = pygame.sprite.groupcollide(escudos, balas_jugador, False, True)
+            for escudo in colisiones_escudos_balas_jugador:
+                escudo.recibir_daño()
+            
+            colisiones_escudos_balas_aliens = pygame.sprite.groupcollide(escudos, balas_aliens, False, True)
+            for escudo in colisiones_escudos_balas_aliens:
+                escudo.recibir_daño()
+            
+            # Colisiones entre balas de aliens y jugador
+            colisiones_jugador = pygame.sprite.spritecollide(jugador, balas_aliens, True)
+            if colisiones_jugador:
+                game_over = True
+            
+            # Comprobar si los aliens llegaron al jugador
+            for alien in aliens:
+                if alien.rect.bottom >= jugador.rect.top:
                     game_over = True
+                    break
             
-            # Colisiones de balas con barreras
-            for barrier in barriers:
-                for block in barrier.blocks:
-                    hits = pygame.sprite.spritecollide(block, bullets, True)
-                    for hit in hits:
-                        block.hit()
-                    
-                    hits = pygame.sprite.spritecollide(block, alien_bullets, True)
-                    for hit in hits:
-                        block.hit()
-            
-            # Colisiones de aliens con el jugador o la parte inferior
-            for alien in aliens:
-                if alien.rect.bottom > HEIGHT - 50:
-                    game_over = True  # Game over si los aliens llegan abajo
-                if pygame.sprite.collide_rect(alien, player):
-                    game_over = True  # Game over si un alien toca al jugador
-            
-            # Verificar si se han eliminado todos los aliens
+            # Victoria si no quedan aliens
             if len(aliens) == 0:
-                # Mostrar pantalla de nivel completado
-                show_level_complete(level, player.score)
-                
-                # Subir de nivel y reiniciar aliens
-                level += 1
-                aliens = create_aliens(level)
-                
-                # Reiniciar barreras
-                for barrier in barriers:
-                    for block in barrier.blocks:
-                        block.kill()
-                barriers = []
-                for i in range(4):
-                    barrier = Barrier(100 + i * 200, 450)
-                    barriers.append(barrier)
-                
-                # Limpiar balas
-                for bullet in bullets:
-                    bullet.kill()
-                for bullet in alien_bullets:
-                    bullet.kill()
-                
-                # Aumentar velocidad del jugador cada 2 niveles para darle ventaja
-                if level % 2 == 0 and player.speed < 8:
-                    player.speed += 0.5
+                game_over = True
         
         # Dibujar
-        screen.fill(BLACK)
+        pantalla.fill(NEGRO)
+        todos_los_sprites.draw(pantalla)
         
-        # Dibujar todos los sprites
-        all_sprites.draw(screen)
+        # Mostrar puntuación
+        texto_puntuacion = font.render(f"Puntuación: {puntuacion}", True, BLANCO)
+        pantalla.blit(texto_puntuacion, (10, 10))
         
-        # Mostrar información en pantalla
-        draw_text(screen, f"Puntuación: {player.score}", 24, WIDTH // 2, 10)
-        draw_text(screen, f"Vidas: {player.lives}", 24, 50, 10)
-        draw_text(screen, f"Oleada: {level}", 24, WIDTH - 50, 10)
-        
+        # Mostrar mensaje de fin de juego
         if game_over:
-            show_game_over_screen(player.score)
-            return
+            if len(aliens) == 0:
+                mensaje = "¡HAS GANADO!"
+            else:
+                mensaje = "GAME OVER"
+            texto_game_over = font.render(mensaje, True, BLANCO)
+            texto_reiniciar = font.render("Presiona 'R' para reiniciar", True, BLANCO)
+            pantalla.blit(texto_game_over, (ANCHO // 2 - texto_game_over.get_width() // 2, ALTO // 2 - 50))
+            pantalla.blit(texto_reiniciar, (ANCHO // 2 - texto_reiniciar.get_width() // 2, ALTO // 2 + 50))
         
         # Actualizar pantalla
         pygame.display.flip()
-
-# Bucle principal
-def main():
-    show_start_screen()
-    show_alien_info()  # Mostrar información sobre los diferentes tipos de aliens
-    while True:
-        game_loop()
+        
+        # Controlar velocidad del juego
+        clock.tick(60)
+    
+    pygame.quit()
+    sys.exit()
 
 if __name__ == "__main__":
-    main()
+    iniciar_juego()
