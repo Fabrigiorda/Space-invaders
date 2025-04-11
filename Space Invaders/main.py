@@ -6,7 +6,7 @@ import time
 import json
 
 ancho_pantalla = 700
-alto_pantalla = 800
+alto_pantalla = 700
 
 
 
@@ -131,9 +131,30 @@ class disparo:
         pantalla.blit(self.imagen, self.rect)
 
 
-        
 
 
+
+class alien_verde:
+    def __init__(self, imagen, x, y):
+        self.imagen = imagen
+        self.rect = self.imagen.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+        self.activo = True
+
+                
+
+    
+
+class alien_amarillo:
+    pass    
+
+class alien_rojo:
+    pass
+
+
+class alien_azul:
+    pass
 
 
 
