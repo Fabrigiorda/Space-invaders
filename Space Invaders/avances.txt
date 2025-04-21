@@ -1,0 +1,9 @@
+escudos para que la nave se cubra
+oleadas de los aliens (primero verdes q hacen algo, dsp los amarillos que hacen otra cosa, etc y se van mezclando)
+vidas de la nave
+colision de los aliens con las balas y las balas de los aliens con la nave
+sistema de puntos
+ranking con ingresar nombre despues de perder
+opciones (para el sonido)
+animacion de muerte de aliens
+multiplayer
