@@ -9,7 +9,7 @@ import random
 
 #Tamaño pantalla
 ancho_pantalla = 1000
-alto_pantalla = 1000
+alto_pantalla = 750
 
 pygame.init()
 pantalla = pygame.display.set_mode((ancho_pantalla, alto_pantalla))
@@ -91,7 +91,7 @@ boton2 = boton("Multijugador", 200, 60, ((ancho_pantalla-200)/2, 550), negro, am
 boton3 = boton("Ranking", 200, 60, ((ancho_pantalla-200)/2, 650), negro, amarillo)
 boton4 = boton("Opciones", 200, 60, ((ancho_pantalla-200)/2, 750), negro, amarillo)
 boton5 = boton("Salir", 200, 60, ((ancho_pantalla-200)/2, 850), negro, amarillo)
-
+boton6 = boton("Nave", 150, 50, (30, 30), negro, amarillo)
 
 #Defino la clase nave
 class nave:
@@ -300,6 +300,8 @@ def menu(mouseX, mouseY):
     boton3.dibujar_boton(mouseX, mouseY)
     boton4.dibujar_boton(mouseX, mouseY)
     boton5.dibujar_boton(mouseX, mouseY)
+    boton6.dibujar_boton(mouseX, mouseY)
+
 
 
 def obtener_aliens_mas_bajos(aliens):
@@ -488,6 +490,68 @@ def ranking():
 def opciones():
     pass
 
+def personalizar():
+    global nave_img_chica
+    naves = [f for f in os.listdir("imagenes") if f.startswith("nave") and f.endswith(".png")]
+    naves.sort()  # Ensure consistent order
+    indice_actual = 0
+
+    if not os.path.exists("borradas"):
+        os.makedirs("borradas")
+
+    while True:
+        for evento in pygame.event.get():
+            if evento.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif evento.type == pygame.KEYDOWN:
+                if evento.key == pygame.K_ESCAPE:
+                    return
+            elif evento.type == pygame.MOUSEBUTTONDOWN:
+                mouseX, mouseY = pygame.mouse.get_pos()
+                # Flecha izquierda
+                if boton_izquierda.rectangulo.collidepoint(mouseX, mouseY):
+                    indice_actual = (indice_actual - 1) % len(naves)
+                # Flecha derecha
+                elif boton_derecha.rectangulo.collidepoint(mouseX, mouseY):
+                    indice_actual = (indice_actual + 1) % len(naves)
+                # Botón seleccionar
+                elif boton_seleccionar.rectangulo.collidepoint(mouseX, mouseY):
+                    nave_img_chica = pygame.image.load(f"imagenes/{naves[indice_actual]}")
+                    nave_img_chica = pygame.transform.scale(nave_img_chica, (70, 94))
+                    return
+                # Botón eliminar
+                elif boton_eliminar.rectangulo.collidepoint(mouseX, mouseY):
+                    if naves[indice_actual] != "nave.png":
+                        os.rename(f"imagenes/{naves[indice_actual]}", f"borradas/{naves[indice_actual]}")
+                        naves.pop(indice_actual)
+                        if not naves:
+                            return
+                        indice_actual %= len(naves)
+
+        pantalla.fill(negro)
+        pantalla.blit(fondo2, (0, 0))
+
+        # Mostrar nave actual
+        nave_actual = pygame.image.load(f"imagenes/{naves[indice_actual]}")
+        nave_actual = pygame.transform.scale(nave_actual, (150, 200))
+        pantalla.blit(nave_actual, ((ancho_pantalla - 150) // 2, (alto_pantalla - 200) // 2))
+
+        # Dibujar botones
+        boton_izquierda.dibujar_boton(*pygame.mouse.get_pos())
+        boton_derecha.dibujar_boton(*pygame.mouse.get_pos())
+        boton_seleccionar.dibujar_boton(*pygame.mouse.get_pos())
+        boton_eliminar.dibujar_boton(*pygame.mouse.get_pos())
+
+        pygame.display.update()
+        reloj.tick(60)
+
+# Crear botones para personalizar
+boton_izquierda = boton("<", 50, 50, (ancho_pantalla // 2 - 150, alto_pantalla // 2), negro, amarillo)
+boton_derecha = boton(">", 50, 50, (ancho_pantalla // 2 + 100, alto_pantalla // 2), negro, amarillo)
+boton_seleccionar = boton("Seleccionar", 200, 50, ((ancho_pantalla - 200) // 2, alto_pantalla // 2 + 250), negro, amarillo)
+boton_eliminar = boton("Eliminar", 150, 50, (ancho_pantalla - 200, 20), negro, rojo)
+
 
 while True:
     for evento in pygame.event.get():   
@@ -510,6 +574,7 @@ while True:
         elif boton5.rectangulo.collidepoint(mouseX, mouseY):
             pygame.quit()
             sys.exit()
-
+        elif boton6.rectangulo.collidepoint(mouseX, mouseY):
+            personalizar()
     pygame.display.update()
     reloj.tick(60)

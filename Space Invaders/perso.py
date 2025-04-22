@@ -192,19 +192,48 @@ class Juego:
         return False
     
     def guardar_nave(self):
-        # Crear una superficie para la imagen final
-        superficie_nave = pygame.Surface((self.columnas * CELDA, self.filas * CELDA), pygame.SRCALPHA)
-        superficie_nave.fill((0, 0, 0, 0))  # Transparente
-        
-        # Dibujar las piezas en la superficie
+        # Determinar los límites del dibujo
+        min_fila, max_fila, min_columna, max_columna = self.filas, 0, self.columnas, 0
         for fila in range(self.filas):
             for columna in range(self.columnas):
                 if self.cuadricula[fila][columna]:
-                    self.cuadricula[fila][columna].dibujar(superficie_nave, columna * CELDA, fila * CELDA, CELDA)
+                    min_fila = min(min_fila, fila)
+                    max_fila = max(max_fila, fila)
+                    min_columna = min(min_columna, columna)
+                    max_columna = max(max_columna, columna)
+        
+        # Si no hay piezas colocadas, no guardar nada
+        if min_fila > max_fila or min_columna > max_columna:
+            print("No hay piezas para guardar.")
+            return
+        
+        # Calcular el tamaño del dibujo
+        ancho_dibujo = (max_columna - min_columna + 1) * CELDA
+        alto_dibujo = (max_fila - min_fila + 1) * CELDA
+        
+        # Crear una superficie para el dibujo
+        superficie_nave = pygame.Surface((ancho_dibujo, alto_dibujo), pygame.SRCALPHA)
+        superficie_nave.fill((0, 0, 0, 0))  # Transparente
+        
+        # Dibujar las piezas en la superficie
+        for fila in range(min_fila, max_fila + 1):
+            for columna in range(min_columna, max_columna + 1):
+                if self.cuadricula[fila][columna]:
+                    x = (columna - min_columna) * CELDA
+                    y = (fila - min_fila) * CELDA
+                    self.cuadricula[fila][columna].dibujar(superficie_nave, x, y, CELDA)
+        
+        # Buscar el siguiente nombre disponible
+        if not os.path.exists("imagenes"):
+            os.makedirs("imagenes")
+        indice = 1
+        while os.path.exists(f"imagenes/nave{indice}.png"):
+            indice += 1
+        nombre_archivo = f"imagenes/nave{indice}.png"
         
         # Guardar la imagen
-        pygame.image.save(superficie_nave, "nave.png")
-        print("Nave guardada como 'nave.png'")
+        pygame.image.save(superficie_nave, nombre_archivo)
+        print(f"Nave guardada como '{nombre_archivo}'")
     
     def ejecutar(self):
         reloj = pygame.time.Clock()
