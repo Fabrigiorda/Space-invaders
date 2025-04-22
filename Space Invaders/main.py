@@ -153,13 +153,19 @@ class disparo:
 
 #Defino la clase de el alien verde
 class Alien(pygame.sprite.Sprite):
-    def __init__(self, color, x, y):
+    def __init__(self, color, x, y, velocidad, velocidad_x, vidas):
         super().__init__()
         imagen_path = "imagenes/" + color + ".png"
         self.imagen = pygame.image.load(imagen_path).convert_alpha()
         self.imagen = pygame.transform.scale(self.imagen, (65, 65))
         self.rect = self.imagen.get_rect()
         self.rect.topleft = (x, y)
+        self.veloci = velocidad
+        self.vidas_alien = vidas
+
+
+
+             
 
 
 
@@ -198,14 +204,14 @@ def menu(mouseX, mouseY):
 
 
 
-
+nivel = 1
 
 
 
 def jugar_solo():
     jugador = nave(nave_img_chica, ancho_pantalla // 2, alto_pantalla - 40, 7, True)
     puntuacion = 0
-    nivel = 1
+    
     juego_activo = True
     
     balas = []
