@@ -329,7 +329,7 @@ def jugar_solo():
     balas_aliens = []
     puede_disparar = True
     ultimo_disparo = 0
-    tiempo_entre_disparos = 400
+    tiempo_entre_disparos = 0 #antes 400
     ultimo_disparo_alien = 0
     tiempo_entre_disparos_alien = 1000  # Base para disparos aliens
     
@@ -523,7 +523,7 @@ def personalizar():
                 # Botón eliminar
                 elif boton_eliminar.rectangulo.collidepoint(mouseX, mouseY):
                     if naves[indice_actual] != "nave.png":
-                        os.rename(f"imagenes/{naves[indice_actual]}", f"borradas/{naves[indice_actual]}")
+                        os.remove(f"imagenes/{naves[indice_actual]}")
                         naves.pop(indice_actual)
                         if not naves:
                             return
