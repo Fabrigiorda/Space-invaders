@@ -9,7 +9,7 @@ import random
 
 #Tamaño pantalla
 ancho_pantalla = 1000
-alto_pantalla = 750
+alto_pantalla = 1000
 
 pygame.init()
 pantalla = pygame.display.set_mode((ancho_pantalla, alto_pantalla))
@@ -43,6 +43,14 @@ bala_alien_img = pygame.image.load("imagenes/bala_alien.png")
 
 corazon_img = pygame.image.load("imagenes/corazon.png")
 corazon_img = pygame.transform.scale(corazon_img, (30, 30))
+
+# Load gadget images
+gadget_images = [
+    pygame.image.load("imagenes/gadget1.png"),  # Freeze
+    pygame.image.load("imagenes/gadget2.png"),  # Bomb Bullet
+    pygame.image.load("imagenes/gadget3.png"),  # Machine Gun
+    pygame.image.load("imagenes/gadget4.png"),  # Piercing Bullets
+]
 
 #Colores y fuentes
 rojo = (255, 0, 0)
@@ -136,6 +144,7 @@ class disparo:
         self.rect.bottom = y if not es_alien else y
         self.activo = True
         self.es_alien = es_alien
+        self.piercing = False
 
     def actualizar(self):
         if self.es_alien:
@@ -166,12 +175,13 @@ class Alien(pygame.sprite.Sprite):
         self.shooting_speed = velocidad_disparo
         self.max_speed = 10 if tipo == "rojo" else 8 if tipo == "azul" else 5
         self.columna = 0  # Se asignará después
+        self.cambiar_direccion = False  # Flag to indicate direction change
 
     def mover(self):
         self.rect.x += self.velocidad_x
         if self.rect.left < 0 or self.rect.right > ancho_pantalla:
-            self.velocidad_x = -self.velocidad_x
-            self.rect.y += 20
+            self.cambiar_direccion = True  # Set flag to change direction
+            self.rect.y += 10  # Move down less when touching the wall
 
 
 def crear_aliens(nivel):
@@ -263,7 +273,7 @@ def crear_aliens(nivel):
         # Evitar que la velocidad o disparos sean excesivos
         velocidad_base = min(velocidad_base, 8)  # Máximo de velocidad
         velocidad_disparo = max(velocidad_disparo, 400)  # Mínimo tiempo entre disparos
-        vidas = 2
+        vidas = 1
 
     # Organizar aliens en filas y columnas
     aliens_por_columna = {}  # Para rastrear qué aliens están en cada columna
@@ -318,34 +328,145 @@ def obtener_aliens_mas_bajos(aliens):
 
 nivel = 1
 
+class Shield:
+    def __init__(self, x, y):
+        self.rect = pygame.Rect(x, y, 100, 50)
+        self.hits = 0
+        self.max_hits = 7
+
+    def dibujar(self):
+        if self.hits < self.max_hits:
+            pygame.draw.rect(pantalla, verde, self.rect)
+
+    def recibir_dano(self):
+        self.hits += 1
+        if self.hits >= self.max_hits:
+            return True
+        return False
+
+class Gadget:
+    def __init__(self, x, y, tipo):
+        self.rect = pygame.Rect(x, y, 25, 25)  # Adjusted size to 25x25
+        self.tipo = tipo
+        self.imagen = pygame.transform.scale(gadget_images[tipo], (25, 25))  # Scale image to match size
+        self.velocidad = 2  # Gadgets fall slower than bullets
+
+    def actualizar(self):
+        self.rect.y += self.velocidad
+
+    def dibujar(self):
+        pantalla.blit(self.imagen, self.rect)
+
+class Heart:
+    def __init__(self, x, y):
+        self.rect = pygame.Rect(x, y, 30, 30)
+        self.imagen = corazon_img
+        self.velocidad = 2
+
+    def actualizar(self):
+        self.rect.y += self.velocidad
+
+    def dibujar(self):
+        pantalla.blit(self.imagen, self.rect)
+
+def dibujar_columna_gadgets(gadgets_inventario):
+    """Draw the gadget column on the right side of the screen."""
+    columna_x = ancho_pantalla - 60
+    columna_y = 20
+    espacio_entre_gadgets = 50
+
+    for i, gadget in enumerate(gadgets_inventario):
+        pantalla.blit(gadget.imagen, (columna_x, columna_y + i * espacio_entre_gadgets))
+
+def seleccionar_gadget(gadgets_inventario):
+    """Pause the game and allow the player to select a gadget."""
+    seleccion_activa = True
+    while seleccion_activa:
+        pantalla.fill(negro)
+        texto_titulo = fuente.render("Seleccionar Gadget", True, blanco)
+        pantalla.blit(texto_titulo, ((ancho_pantalla - texto_titulo.get_width()) // 2, 20))
+
+        # Draw gadgets in the center of the screen
+        for i, gadget in enumerate(gadgets_inventario):
+            x = (ancho_pantalla - 50) // 2
+            y = 100 + i * 70
+            pantalla.blit(gadget.imagen, (x, y))
+            if pygame.mouse.get_pressed()[0]:  # Left mouse button clicked
+                mouse_x, mouse_y = pygame.mouse.get_pos()
+                if pygame.Rect(x, y, 50, 50).collidepoint(mouse_x, mouse_y):
+                    seleccion_activa = False
+                    return gadget.tipo  # Return the selected gadget type
+
+        # Draw a close button
+        boton_cerrar = pygame.Rect(20, 20, 50, 50)
+        pygame.draw.rect(pantalla, rojo, boton_cerrar)
+        texto_cerrar = fuente.render("X", True, blanco)
+        pantalla.blit(texto_cerrar, (35, 25))
+        if pygame.mouse.get_pressed()[0]:  # Left mouse button clicked
+            mouse_x, mouse_y = pygame.mouse.get_pos()
+            if boton_cerrar.collidepoint(mouse_x, mouse_y):
+                seleccion_activa = False
+                return None  # No gadget selected
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+        pygame.display.update()
+        reloj.tick(60)
+
 def jugar_solo():
     global nivel
+    nivel = 1  # Reset level
+    puntuacion = 0  # Reset score
     jugador = nave(nave_img_chica, ancho_pantalla // 2, alto_pantalla - 40, 7, True)
-    puntuacion = 0
-    
     juego_activo = True
-    
     balas = []
     balas_aliens = []
+    gadgets = []
+    corazones = []
+    gadgets_inventario = []  # Collected gadgets
     puede_disparar = True
     ultimo_disparo = 0
-    tiempo_entre_disparos = 0 #antes 400
+    tiempo_entre_disparos = 400
     ultimo_disparo_alien = 0
-    tiempo_entre_disparos_alien = 1000  # Base para disparos aliens
-    
+    tiempo_entre_disparos_alien = 1000
     aliens = crear_aliens(nivel)
-    
-    # Para el parpadeo cuando la nave es golpeada
+
+    # Gadget effects
+    freeze_timer = 0
+    machine_gun_timer = 0
+    piercing_bullets = False
+
+    # Create shields
+    shields = [
+        Shield(150, alto_pantalla - 200),
+        Shield(350, alto_pantalla - 200),
+        Shield(550, alto_pantalla - 200),
+        Shield(750, alto_pantalla - 200),
+    ]
+
+    # For blinking effect when the ship is hit
     invulnerable = False
     tiempo_invulnerable = 0
-    duracion_invulnerable = 2000  # 2 segundos de invulnerabilidad
+    duracion_invulnerable = 2000  # 2 seconds of invulnerability
     parpadeo = False
     ultimo_parpadeo = 0
-    intervalo_parpadeo = 200  # 200ms entre parpadeos
+    intervalo_parpadeo = 200  # 200ms between blinks
 
     while juego_activo:
         tiempo_actual = pygame.time.get_ticks()
-        
+
+        # Handle timers for gadgets
+        if freeze_timer > 0 and tiempo_actual - freeze_timer > 5000:
+            freeze_timer = 0
+        if machine_gun_timer > 0 and tiempo_actual - machine_gun_timer > 7000:
+            machine_gun_timer = 0
+            tiempo_entre_disparos = 400
+        if piercing_bullets and tiempo_actual - machine_gun_timer > 7000:
+            piercing_bullets = False
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -355,131 +476,157 @@ def jugar_solo():
                     juego_activo = False
                 elif event.key == pygame.K_SPACE and puede_disparar and tiempo_actual - ultimo_disparo > tiempo_entre_disparos:
                     nueva_bala = disparo(jugador.cuadrado.centerx, jugador.cuadrado.top, 10)
+                    nueva_bala.piercing = piercing_bullets
                     balas.append(nueva_bala)
                     ultimo_disparo = tiempo_actual
-                    
+                elif event.key == pygame.K_RETURN and gadgets_inventario:
+                    gadget_tipo = seleccionar_gadget(gadgets_inventario)
+                    if gadget_tipo is not None:
+                        gadgets_inventario = [g for g in gadgets_inventario if g.tipo != gadget_tipo]  # Remove used gadget
+                        if gadget_tipo == 0:  # Freeze
+                            freeze_timer = tiempo_actual
+                        elif gadget_tipo == 1:  # Bomb Bullet
+                            pass  # Implement bomb bullet logic
+                        elif gadget_tipo == 2:  # Machine Gun
+                            machine_gun_timer = tiempo_actual
+                            tiempo_entre_disparos = 50
+                        elif gadget_tipo == 3:  # Piercing Bullets
+                            piercing_bullets = True
+                            machine_gun_timer = tiempo_actual
+
         pantalla.blit(fondo2, (0, 0))
-        
         jugador.actualizar()
-        
-        # Control de invulnerabilidad y parpadeo
+
+        # Handle invulnerability and blinking
         if invulnerable:
             if tiempo_actual - tiempo_invulnerable > duracion_invulnerable:
                 invulnerable = False
-            
-            # Efecto de parpadeo
+
+            # Blinking effect
             if tiempo_actual - ultimo_parpadeo > intervalo_parpadeo:
                 parpadeo = not parpadeo
                 ultimo_parpadeo = tiempo_actual
-            
+
             if not parpadeo:
                 pantalla.blit(nave_img_chica, jugador.cuadrado)
         else:
             pantalla.blit(nave_img_chica, jugador.cuadrado)
-        
-        # Movimiento de aliens
+
+        # Draw and update shields
+        for shield in shields[:]:
+            shield.dibujar()
+            for bala_alien in balas_aliens[:]:
+                if shield.rect.colliderect(bala_alien.rect):
+                    if shield.recibir_dano():
+                        shields.remove(shield)
+                    balas_aliens.remove(bala_alien)
+
+        # Move and draw aliens
+        cambiar_direccion_global = False
         for alien in aliens[:]:
-            alien.mover()
+            if freeze_timer == 0:  # Freeze effect
+                alien.mover()
+                if alien.cambiar_direccion:
+                    cambiar_direccion_global = True
+                    alien.cambiar_direccion = False  # Reset flag
             pantalla.blit(alien.imagen, alien.rect)
 
-            # Colisión con balas del jugador
             for bala in balas[:]:
                 if alien.rect.colliderect(bala.rect):
                     alien.vidas -= 1
                     if alien.vidas <= 0:
                         aliens.remove(alien)
-                        # Puntuación según el tipo de alien
-                        if alien.tipo == "verde":
-                            puntuacion += 10
-                        elif alien.tipo == "amarillo":
-                            puntuacion += 20
-                        elif alien.tipo == "rojo":
-                            puntuacion += 30
-                        elif alien.tipo == "azul":
-                            puntuacion += 40
-                    balas.remove(bala)
+                        puntuacion += 10 if alien.tipo == "verde" else 20 if alien.tipo == "amarillo" else 30 if alien.tipo == "rojo" else 40
+                        # Drop heart or gadget
+                        if random.random() < 0.04:  # 4% chance
+                            drop_x = max(0, min(alien.rect.centerx, ancho_pantalla - 25))  # Ensure inside screen
+                            drop_y = max(0, min(alien.rect.centery, alto_pantalla - 25))
+                            if random.random() < 0.5:
+                                corazones.append(Heart(drop_x, drop_y))
+                            else:
+                                gadgets.append(Gadget(drop_x, drop_y, random.randint(0, 3)))
+                    if not bala.piercing:
+                        balas.remove(bala)
                     break
-        
-        # Obtener aliens más bajos para disparar
+
+        # Change direction and move down for all aliens if needed
+        if cambiar_direccion_global:
+            for alien in aliens:
+                alien.velocidad_x = -alien.velocidad_x
+                alien.rect.y += 10  # Move all aliens down less
+
+        # Alien shooting logic
         aliens_disparadores = obtener_aliens_mas_bajos(aliens)
-        
-        # Sistema de disparo aleatorio para aliens
         if tiempo_actual - ultimo_disparo_alien > tiempo_entre_disparos_alien and aliens_disparadores:
-            # Elegir un alien aleatorio de los que están más abajo para disparar
             alien_disparador = random.choice(aliens_disparadores)
-            
-            # Ajustar la velocidad de disparo según el tipo de alien
-            velocidad_bala = 5
-            if alien_disparador.tipo == "amarillo":
-                velocidad_bala = 6  # Amarillos disparan más rápido
-            
-            nueva_bala_alien = disparo(alien_disparador.rect.centerx, alien_disparador.rect.bottom, velocidad_bala, True)
+            nueva_bala_alien = disparo(alien_disparador.rect.centerx, alien_disparador.rect.bottom, 5, True)
             balas_aliens.append(nueva_bala_alien)
             ultimo_disparo_alien = tiempo_actual
-        
-        # Actualizar balas del jugador
+
+        # Update player bullets
         for bala in balas[:]:
             bala.actualizar()
             if bala.activo:
                 bala.dibujar(pantalla)
             else:
                 balas.remove(bala)
-        
-        # Actualizar balas de aliens
+
+        # Update alien bullets
         for bala_alien in balas_aliens[:]:
             bala_alien.actualizar()
             if bala_alien.activo:
                 bala_alien.dibujar(pantalla)
-                # Revisar si golpea al jugador
-                if not invulnerable and bala_alien.rect.colliderect(jugador.cuadrado):
+                if bala_alien.rect.colliderect(jugador.cuadrado) and not invulnerable:
                     jugador.vidas -= 1
                     balas_aliens.remove(bala_alien)
-                    
-                    # Activar invulnerabilidad
                     invulnerable = True
                     tiempo_invulnerable = tiempo_actual
-                    
-                    # Si no quedan vidas, terminar el juego
                     if jugador.vidas <= 0:
                         juego_activo = False
             else:
                 balas_aliens.remove(bala_alien)
-        
-        # Si no quedan aliens, pasar al siguiente nivel
+
+        # Update and draw gadgets
+        for gadget in gadgets[:]:
+            gadget.actualizar()
+            if gadget.rect.colliderect(jugador.cuadrado):  # Fix collision detection
+                gadgets.remove(gadget)
+                gadgets_inventario.append(gadget)  # Add gadget to inventory
+            elif gadget.rect.top > alto_pantalla:
+                gadgets.remove(gadget)
+            else:
+                gadget.dibujar()
+
+        # Update and draw hearts
+        for heart in corazones[:]:
+            heart.actualizar()
+            if heart.rect.colliderect(jugador.cuadrado) and jugador.vidas < 3:  # Fix collision detection
+                jugador.vidas += 1
+                corazones.remove(heart)
+            elif heart.rect.top > alto_pantalla:
+                corazones.remove(heart)
+            else:
+                heart.dibujar()
+
+        # Draw gadget column
+        dibujar_columna_gadgets(gadgets_inventario)
+
+        # Check if all aliens are defeated
         if not aliens:
             nivel += 1
             aliens = crear_aliens(nivel)
-            # Reset de balas
             balas = []
             balas_aliens = []
-        
-        # Información de juego
+
+        # Display game info
         texto_puntos = fuente.render(f"Puntos: {puntuacion}", True, blanco)
         texto_nivel = fuente.render(f"Oleada: {nivel}", True, blanco)
-        
-        # Mostrar el tipo de alien de la oleada actual
-        tipo_alien = ""
-        if nivel <= 2 or nivel == 6 or nivel == 7:
-            tipo_alien = "Verdes"
-        elif nivel == 3 or nivel == 4 or nivel == 8 or nivel == 9:
-            tipo_alien = "Amarillos"
-        elif nivel == 5 or nivel == 10 or nivel == 11:
-            tipo_alien = "Rojos"
-        elif nivel >= 12:
-            tipo_alien = "Azules"
-            
-        texto_tipo = fuente.render(f"Aliens: {tipo_alien}", True, blanco)
-        
         pantalla.blit(texto_puntos, (20, 20))
         pantalla.blit(texto_nivel, (ancho_pantalla - 200, 20))
-        pantalla.blit(texto_tipo, (ancho_pantalla // 2 - 100, 20))
-        
-        # Dibujar vidas
         jugador.dibujar_vidas()
-        
+
         pygame.display.update()
         reloj.tick(60)
-
 
 def multijugador():
     pass
