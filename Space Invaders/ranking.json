@@ -1,0 +1,24 @@
+{
+    "jugar solo": [
+        {
+            "nombre": "fabrik",
+            "puntos": 80
+        },
+        {
+            "nombre": "hola",
+            "puntos": 440
+        }
+    ],
+    "multijugador": [
+        {
+            "nombre": "Fabri y titi",
+            "puntos": 160
+        }
+    ],
+    "solo": [
+        {
+            "nombre": "Fabri",
+            "puntos": 3640
+        }
+    ]
+}
