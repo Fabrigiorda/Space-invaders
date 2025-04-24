@@ -7,12 +7,32 @@
         {
             "nombre": "hola",
             "puntos": 440
+        },
+        {
+            "nombre": "fabrikkkkkkk",
+            "puntos": 379
+        },
+        {
+            "nombre": "fdsarew",
+            "puntos": 20
         }
     ],
     "multijugador": [
         {
             "nombre": "Fabri y titi",
             "puntos": 160
+        },
+        {
+            "nombre": "fabri y luchi",
+            "puntos": 3120
+        },
+        {
+            "nombre": "fabri y thomas",
+            "puntos": 11240
+        },
+        {
+            "nombre": "asd y fdsa",
+            "puntos": 1240
         }
     ],
     "solo": [
